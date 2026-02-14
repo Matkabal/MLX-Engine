@@ -40,6 +40,24 @@
     <ClCompile Include="D:\estudo directx\src\editor\ModelImport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\EditorUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\SceneView.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\SceneCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\HierarchyPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\InspectorPanel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\GizmoSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="D:\estudo directx\src\core\InputController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

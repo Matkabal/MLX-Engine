@@ -5,6 +5,9 @@
 #include <cstring>
 #include <deque>
 #include <filesystem>
+#include <functional>
+#include <limits>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -29,12 +32,6 @@ namespace
     constexpr int kCatalogTreeId = 9101;
     constexpr int kSceneTreeId = 9102;
     constexpr int kBtnDeleteEntityId = 9201;
-    constexpr int kBtnMoveXpId = 9202;
-    constexpr int kBtnMoveXmId = 9203;
-    constexpr int kBtnMoveYpId = 9204;
-    constexpr int kBtnMoveYmId = 9205;
-    constexpr int kBtnMoveZpId = 9206;
-    constexpr int kBtnMoveZmId = 9207;
     constexpr int kPanelHeight = 260;
 
     constexpr uint64_t kPayloadTypeNone = 0;
@@ -158,15 +155,51 @@ public:
         mouseNdcX_ = (static_cast<float>(x) / static_cast<float>(width_)) * 2.0f - 1.0f;
         mouseNdcY_ = 1.0f - (static_cast<float>(y) / static_cast<float>(viewportHeight)) * 2.0f;
         renderer_.OnMouseMoveNdc(mouseNdcX_, mouseNdcY_);
+
+        if (isDraggingEntity_ && selectedEntity_ != ecs::kInvalidEntity)
+        {
+            auto* t = scene_.Components().Get<scene::TransformComponent>(selectedEntity_);
+            if (t)
+            {
+                t->local.position.x = dragStartPosition_.x + (mouseNdcX_ - dragStartMouseNdcX_);
+                t->local.position.y = dragStartPosition_.y + (mouseNdcY_ - dragStartMouseNdcY_);
+            }
+        }
     }
 
     void OnMouseButton(bool leftDown) override
     {
-        if (leftDown && cursorInsideViewport_ && !placementAsset_.empty())
+        if (!cursorInsideViewport_)
         {
-            math::Transform root{};
-            root.position = math::Vec3{mouseNdcX_, mouseNdcY_, 0.0f};
-            InstantiateAssetHierarchy(placementAsset_, root);
+            renderer_.OnMouseButton(leftDown);
+            return;
+        }
+
+        if (leftDown)
+        {
+            if (selectedEntity_ != ecs::kInvalidEntity)
+            {
+                auto* t = scene_.Components().Get<scene::TransformComponent>(selectedEntity_);
+                if (t)
+                {
+                    isDraggingEntity_ = true;
+                    dragStartMouseNdcX_ = mouseNdcX_;
+                    dragStartMouseNdcY_ = mouseNdcY_;
+                    dragStartPosition_ = t->local.position;
+                }
+            }
+            else if (!placementAsset_.empty())
+            {
+                math::Transform root{};
+                root.position = math::Vec3{mouseNdcX_, mouseNdcY_, 0.0f};
+                InstantiateAssetHierarchy(placementAsset_, root);
+                SaveSceneFromEcs();
+                RefreshSceneTree();
+            }
+        }
+        else if (isDraggingEntity_)
+        {
+            isDraggingEntity_ = false;
             SaveSceneFromEcs();
             RefreshSceneTree();
         }
@@ -197,13 +230,6 @@ public:
             DeleteSelectedEntity();
             return;
         }
-
-        if (id == kBtnMoveXpId) { MoveSelectedEntity(0.1f, 0.0f, 0.0f); return; }
-        if (id == kBtnMoveXmId) { MoveSelectedEntity(-0.1f, 0.0f, 0.0f); return; }
-        if (id == kBtnMoveYpId) { MoveSelectedEntity(0.0f, 0.1f, 0.0f); return; }
-        if (id == kBtnMoveYmId) { MoveSelectedEntity(0.0f, -0.1f, 0.0f); return; }
-        if (id == kBtnMoveZpId) { MoveSelectedEntity(0.0f, 0.0f, 0.1f); return; }
-        if (id == kBtnMoveZmId) { MoveSelectedEntity(0.0f, 0.0f, -0.1f); return; }
     }
 
     void OnNotify(const NMHDR* hdr) override
@@ -258,6 +284,45 @@ public:
     }
 
 private:
+    void NormalizeLegacySceneObjects(std::vector<assets::SceneObjectSpec>& objects) const
+    {
+        // Legacy scenes may contain one entry per mesh (meshIndex>=0) for the same asset.
+        // New format expects one entity per asset (meshIndex=-1, primitiveIndex=-1).
+        std::unordered_map<std::string, assets::SceneObjectSpec> merged{};
+        merged.reserve(objects.size());
+
+        for (const auto& obj : objects)
+        {
+            if (obj.assetPath.empty())
+            {
+                continue;
+            }
+
+            auto it = merged.find(obj.assetPath);
+            if (it == merged.end())
+            {
+                assets::SceneObjectSpec root = obj;
+                root.meshIndex = -1;
+                root.primitiveIndex = -1;
+                merged.emplace(obj.assetPath, std::move(root));
+                continue;
+            }
+
+            // Keep transform from a full-asset entry when present.
+            if (obj.meshIndex < 0 && obj.primitiveIndex < 0)
+            {
+                it->second.transform = obj.transform;
+            }
+        }
+
+        objects.clear();
+        objects.reserve(merged.size());
+        for (auto& [_, spec] : merged)
+        {
+            objects.push_back(std::move(spec));
+        }
+    }
+
     bool SelectProjectAndLoadScene()
     {
         if (!editor::ProjectBrowserWindow::ShowModal(instance_, "projects", activeProjectPath_))
@@ -286,6 +351,7 @@ private:
             MessageBoxA(nullptr, loadErr.c_str(), "Scene Load Error", MB_ICONERROR | MB_OK);
             return false;
         }
+        NormalizeLegacySceneObjects(objects);
 
         scene_.Clear();
         for (const auto& obj : objects)
@@ -300,6 +366,7 @@ private:
             tr.local = obj.transform;
             scene_.Components().Add<scene::TransformComponent>(e, tr);
         }
+        SaveSceneFromEcs();
 
         if (scene_.BuildRenderList().empty())
         {
@@ -315,51 +382,18 @@ private:
 
     void InstantiateAssetHierarchy(const std::string& assetFileName, const math::Transform& rootTransform)
     {
-        const std::string fullPath = (std::filesystem::path("assets/models") / assetFileName).string();
-        std::string err;
-        const auto asset = assetManager_.LoadGltf(fullPath, &err);
-        if (!asset)
-        {
-            return;
-        }
-
+        // One asset import => one entity in scene.
+        // Renderer uses meshIndex=-1 to draw all meshes from the glTF.
         const ecs::Entity rootEntity = scene_.CreateEntity();
         scene::TransformComponent rootTc{};
         rootTc.local = rootTransform;
         scene_.Components().Add<scene::TransformComponent>(rootEntity, rootTc);
         scene_.Components().Add<scene::NameComponent>(
             rootEntity,
-            scene::NameComponent{std::filesystem::path(assetFileName).stem().string() + "_root"});
-
-        std::vector<ecs::Entity> nodeEntities(asset->scene.nodes.size(), ecs::kInvalidEntity);
-        for (size_t i = 0; i < asset->scene.nodes.size(); ++i)
-        {
-            nodeEntities[i] = scene_.CreateEntity();
-        }
-
-        for (size_t i = 0; i < asset->scene.nodes.size(); ++i)
-        {
-            const auto& node = asset->scene.nodes[i];
-            const ecs::Entity e = nodeEntities[i];
-            const std::string nodeName = !node.name.empty()
-                ? node.name
-                : (std::filesystem::path(assetFileName).stem().string() + "_node_" + std::to_string(i));
-            scene_.Components().Add<scene::NameComponent>(e, scene::NameComponent{nodeName});
-
-            scene::TransformComponent tc{};
-            tc.local = node.localTransform;
-            tc.parent = (node.parentIndex >= 0 && node.parentIndex < static_cast<int>(nodeEntities.size()))
-                ? nodeEntities[static_cast<size_t>(node.parentIndex)]
-                : rootEntity;
-            scene_.Components().Add<scene::TransformComponent>(e, tc);
-
-            if (node.meshIndex >= 0)
-            {
-                scene_.Components().Add<scene::MeshRendererComponent>(
-                    e,
-                    scene::MeshRendererComponent{assetFileName, node.meshIndex, -1, true});
-            }
-        }
+            scene::NameComponent{std::filesystem::path(assetFileName).stem().string()});
+        scene_.Components().Add<scene::MeshRendererComponent>(
+            rootEntity,
+            scene::MeshRendererComponent{assetFileName, -1, -1, true});
     }
 
     void SaveSceneFromEcs()
@@ -381,24 +415,6 @@ private:
         }
         std::string err;
         assets::SceneRepository::SaveScene(activeScenePath_, out, &err);
-    }
-
-    void MoveSelectedEntity(float dx, float dy, float dz)
-    {
-        if (selectedEntity_ == ecs::kInvalidEntity)
-        {
-            return;
-        }
-        auto* t = scene_.Components().Get<scene::TransformComponent>(selectedEntity_);
-        if (!t)
-        {
-            return;
-        }
-        t->local.position.x += dx;
-        t->local.position.y += dy;
-        t->local.position.z += dz;
-        SaveSceneFromEcs();
-        RefreshSceneTree();
     }
 
     void DeleteSelectedEntity()
@@ -445,18 +461,6 @@ private:
 
         btnDelete_ = CreateWindowExW(0, L"BUTTON", L"Delete", WS_CHILD | WS_VISIBLE, 0, 0, 80, 26,
             window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnDeleteEntityId)), instance_, nullptr);
-        btnXp_ = CreateWindowExW(0, L"BUTTON", L"+X", WS_CHILD | WS_VISIBLE, 0, 0, 45, 26,
-            window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnMoveXpId)), instance_, nullptr);
-        btnXm_ = CreateWindowExW(0, L"BUTTON", L"-X", WS_CHILD | WS_VISIBLE, 0, 0, 45, 26,
-            window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnMoveXmId)), instance_, nullptr);
-        btnYp_ = CreateWindowExW(0, L"BUTTON", L"+Y", WS_CHILD | WS_VISIBLE, 0, 0, 45, 26,
-            window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnMoveYpId)), instance_, nullptr);
-        btnYm_ = CreateWindowExW(0, L"BUTTON", L"-Y", WS_CHILD | WS_VISIBLE, 0, 0, 45, 26,
-            window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnMoveYmId)), instance_, nullptr);
-        btnZp_ = CreateWindowExW(0, L"BUTTON", L"+Z", WS_CHILD | WS_VISIBLE, 0, 0, 45, 26,
-            window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnMoveZpId)), instance_, nullptr);
-        btnZm_ = CreateWindowExW(0, L"BUTTON", L"-Z", WS_CHILD | WS_VISIBLE, 0, 0, 45, 26,
-            window_.GetHandle(), reinterpret_cast<HMENU>(static_cast<INT_PTR>(kBtnMoveZmId)), instance_, nullptr);
 
         // Force readable text rendering in all child controls.
         const HFONT uiFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
@@ -465,12 +469,6 @@ private:
         SendMessageW(catalogTree_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         SendMessageW(sceneTree_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
         SendMessageW(btnDelete_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
-        SendMessageW(btnXp_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
-        SendMessageW(btnXm_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
-        SendMessageW(btnYp_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
-        SendMessageW(btnYm_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
-        SendMessageW(btnZp_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
-        SendMessageW(btnZm_, WM_SETFONT, reinterpret_cast<WPARAM>(uiFont), TRUE);
 
         TreeView_SetBkColor(catalogTree_, RGB(255, 255, 255));
         TreeView_SetTextColor(catalogTree_, RGB(0, 0, 0));
@@ -513,14 +511,7 @@ private:
         MoveWindow(sceneTree_, 22 + catalogWidth, panelTop + 18, sceneWidth, treeHeight, TRUE);
 
         const int btnY = panelTop + 22 + treeHeight;
-        int x = 14;
-        MoveWindow(btnDelete_, x, btnY, 80, 26, TRUE); x += 90;
-        MoveWindow(btnXp_, x, btnY, 45, 26, TRUE); x += 50;
-        MoveWindow(btnXm_, x, btnY, 45, 26, TRUE); x += 55;
-        MoveWindow(btnYp_, x, btnY, 45, 26, TRUE); x += 50;
-        MoveWindow(btnYm_, x, btnY, 45, 26, TRUE); x += 55;
-        MoveWindow(btnZp_, x, btnY, 45, 26, TRUE); x += 50;
-        MoveWindow(btnZm_, x, btnY, 45, 26, TRUE);
+        MoveWindow(btnDelete_, 14, btnY, 80, 26, TRUE);
     }
 
     void LoadCatalogTree()
@@ -559,62 +550,204 @@ private:
     {
         sceneTextPool_.clear();
         TreeView_DeleteAllItems(sceneTree_);
-        selectedEntity_ = ecs::kInvalidEntity;
+        if (selectedEntity_ != ecs::kInvalidEntity && !scene_.Entities().IsAlive(selectedEntity_))
+        {
+            selectedEntity_ = ecs::kInvalidEntity;
+        }
         HTREEITEM rootItem = InsertTreeItem(sceneTree_, TVI_ROOT, L"Scene", static_cast<LPARAM>(EncodePayload(kPayloadTypeNone, 0)), sceneTextPool_);
-        HTREEITEM assetsGroupItem = InsertTreeItem(sceneTree_, rootItem, L"Assets", static_cast<LPARAM>(EncodePayload(kPayloadTypeNone, 0)), sceneTextPool_);
-        HTREEITEM entitiesGroupItem = InsertTreeItem(sceneTree_, rootItem, L"Entities", static_cast<LPARAM>(EncodePayload(kPayloadTypeNone, 0)), sceneTextPool_);
+        HTREEITEM assetsItem = InsertTreeItem(sceneTree_, rootItem, L"Assets", static_cast<LPARAM>(EncodePayload(kPayloadTypeNone, 0)), sceneTextPool_);
 
-        const auto renderList = scene_.BuildRenderList();
-        std::unordered_map<std::string, uint32_t> counts;
-        for (const auto& item : renderList)
+        const auto* trStorage = scene_.Components().TryGetStorage<scene::TransformComponent>();
+        if (trStorage)
         {
-            counts[item.assetPath]++;
-        }
-        for (const auto& [asset, count] : counts)
-        {
-            char buf[256];
-            sprintf_s(buf, "%s (%u)", asset.c_str(), static_cast<unsigned int>(count));
-            std::wstring w = ToWide(buf);
-            InsertTreeItem(sceneTree_, assetsGroupItem, w, static_cast<LPARAM>(EncodePayload(kPayloadTypeNone, 0)), sceneTextPool_);
-        }
-
-        for (const auto& item : renderList)
-        {
-            float x = 0.0f, y = 0.0f, z = 0.0f;
-            if (const auto* t = scene_.Components().Get<scene::TransformComponent>(item.entity))
+            std::unordered_map<ecs::Entity, std::vector<ecs::Entity>> childrenByParent;
+            std::vector<ecs::Entity> roots;
+            const auto& entities = trStorage->Entities();
+            const auto& transforms = trStorage->Components();
+            for (size_t i = 0; i < entities.size() && i < transforms.size(); ++i)
             {
-                x = t->local.position.x;
-                y = t->local.position.y;
-                z = t->local.position.z;
-            }
-
-            std::string objectName = "Entity";
-            if (const auto* name = scene_.Components().Get<scene::NameComponent>(item.entity))
-            {
-                if (!name->value.empty())
+                const ecs::Entity e = entities[i];
+                const ecs::Entity p = transforms[i].parent;
+                if (p == ecs::kInvalidEntity || !scene_.Entities().IsAlive(p))
                 {
-                    objectName = name->value;
+                    roots.push_back(e);
+                }
+                else
+                {
+                    childrenByParent[p].push_back(e);
                 }
             }
 
-            char buf[256];
-            sprintf_s(buf, "%s (E%u) | %s | X=%.2f Y=%.2f Z=%.2f",
-                objectName.c_str(),
-                static_cast<unsigned int>(item.entity),
-                item.assetPath.c_str(),
-                x, y, z);
-            std::wstring w = ToWide(buf);
-            InsertTreeItem(
-                sceneTree_,
-                entitiesGroupItem,
-                w,
-                static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(item.entity))),
-                sceneTextPool_);
+            const std::function<void(ecs::Entity, HTREEITEM)> addNode =
+                [&](ecs::Entity entity, HTREEITEM parentItem)
+            {
+                std::string objectName = "Entity";
+                if (const auto* name = scene_.Components().Get<scene::NameComponent>(entity))
+                {
+                    if (!name->value.empty())
+                    {
+                        objectName = name->value;
+                    }
+                }
+
+                std::string assetName = "-";
+                int meshIndex = -1;
+                int primitiveIndex = -1;
+                if (const auto* mesh = scene_.Components().Get<scene::MeshRendererComponent>(entity))
+                {
+                    if (!mesh->assetPath.empty())
+                    {
+                        assetName = mesh->assetPath;
+                    }
+                    meshIndex = mesh->meshIndex;
+                    primitiveIndex = mesh->primitiveIndex;
+                }
+
+                float x = 0.0f, y = 0.0f, z = 0.0f;
+                if (const auto* t = scene_.Components().Get<scene::TransformComponent>(entity))
+                {
+                    x = t->local.position.x;
+                    y = t->local.position.y;
+                    z = t->local.position.z;
+                }
+
+                char buf[256];
+                sprintf_s(buf, "%s (E%u)",
+                    objectName.c_str(),
+                    static_cast<unsigned int>(entity));
+                const std::wstring w = ToWide(buf);
+
+                const HTREEITEM thisItem = InsertTreeItem(
+                    sceneTree_,
+                    parentItem,
+                    w,
+                    static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))),
+                    sceneTextPool_);
+
+                // Composite de informacoes da entidade.
+                const HTREEITEM infoItem = InsertTreeItem(
+                    sceneTree_,
+                    thisItem,
+                    L"Info",
+                    static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))),
+                    sceneTextPool_);
+
+                char transformBuf[256];
+                sprintf_s(transformBuf, "Transform: X=%.2f Y=%.2f Z=%.2f", x, y, z);
+                InsertTreeItem(sceneTree_, infoItem, ToWide(transformBuf), static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))), sceneTextPool_);
+
+                char meshBuf[256];
+                sprintf_s(meshBuf, "Mesh: %s | mesh=%d | prim=%d", assetName.c_str(), meshIndex, primitiveIndex);
+                InsertTreeItem(sceneTree_, infoItem, ToWide(meshBuf), static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))), sceneTextPool_);
+
+                // Tamanho (AABB local) do mesh, quando houver.
+                if (assetName != "-" && meshIndex >= 0)
+                {
+                    const std::string fullPath = (std::filesystem::path("assets/models") / assetName).string();
+                    std::string err;
+                    const auto loaded = assetManager_.LoadGltf(fullPath, &err);
+                    if (loaded && meshIndex < static_cast<int>(loaded->scene.meshes.size()))
+                    {
+                        const auto& meshData = loaded->scene.meshes[static_cast<size_t>(meshIndex)];
+                        int primBegin = 0;
+                        int primEnd = static_cast<int>(meshData.primitives.size());
+                        if (primitiveIndex >= 0 && primitiveIndex < primEnd)
+                        {
+                            primBegin = primitiveIndex;
+                            primEnd = primitiveIndex + 1;
+                        }
+
+                        math::Vec3 minV{
+                            (std::numeric_limits<float>::max)(),
+                            (std::numeric_limits<float>::max)(),
+                            (std::numeric_limits<float>::max)()};
+                        math::Vec3 maxV{
+                            -(std::numeric_limits<float>::max)(),
+                            -(std::numeric_limits<float>::max)(),
+                            -(std::numeric_limits<float>::max)()};
+                        bool hasVertex = false;
+
+                        for (int p = primBegin; p < primEnd; ++p)
+                        {
+                            const auto& prim = meshData.primitives[static_cast<size_t>(p)];
+                            for (const auto& v : prim.vertices)
+                            {
+                                hasVertex = true;
+                                minV.x = (v.position.x < minV.x) ? v.position.x : minV.x;
+                                minV.y = (v.position.y < minV.y) ? v.position.y : minV.y;
+                                minV.z = (v.position.z < minV.z) ? v.position.z : minV.z;
+                                maxV.x = (v.position.x > maxV.x) ? v.position.x : maxV.x;
+                                maxV.y = (v.position.y > maxV.y) ? v.position.y : maxV.y;
+                                maxV.z = (v.position.z > maxV.z) ? v.position.z : maxV.z;
+                            }
+                        }
+
+                        if (hasVertex)
+                        {
+                            const math::Vec3 size{maxV.x - minV.x, maxV.y - minV.y, maxV.z - minV.z};
+                            char sizeBuf[256];
+                            sprintf_s(sizeBuf, "Tamanho: W=%.3f H=%.3f D=%.3f", size.x, size.y, size.z);
+                            InsertTreeItem(sceneTree_, infoItem, ToWide(sizeBuf), static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))), sceneTextPool_);
+                        }
+                    }
+                }
+
+                // Files associados ao asset.
+                if (assetName != "-")
+                {
+                    const HTREEITEM filesItem = InsertTreeItem(
+                        sceneTree_,
+                        thisItem,
+                        L"Files",
+                        static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))),
+                        sceneTextPool_);
+
+                    std::set<std::string> files{};
+                    const std::filesystem::path gltfPath = std::filesystem::path("assets/models") / assetName;
+                    files.insert(gltfPath.filename().string());
+
+                    const std::filesystem::path candidateBin = gltfPath.parent_path() / (gltfPath.stem().string() + ".bin");
+                    if (std::filesystem::exists(candidateBin))
+                    {
+                        files.insert(candidateBin.filename().string());
+                    }
+
+                    std::string loadErr;
+                    const auto loaded = assetManager_.LoadGltf(gltfPath.string(), &loadErr);
+                    if (loaded)
+                    {
+                        for (const auto& mat : loaded->scene.materials)
+                        {
+                            if (!mat.baseColorTexturePath.empty())
+                            {
+                                files.insert(std::filesystem::path(mat.baseColorTexturePath).filename().string());
+                            }
+                        }
+                    }
+
+                    for (const auto& file : files)
+                    {
+                        InsertTreeItem(
+                            sceneTree_,
+                            filesItem,
+                            ToWide(file),
+                            static_cast<LPARAM>(EncodePayload(kPayloadTypeEntity, static_cast<uint32_t>(entity))),
+                            sceneTextPool_);
+                    }
+                    TreeView_Expand(sceneTree_, filesItem, TVE_EXPAND);
+                }
+
+                TreeView_Expand(sceneTree_, infoItem, TVE_EXPAND);
+            };
+
+            for (const ecs::Entity root : roots)
+            {
+                addNode(root, assetsItem);
+            }
         }
 
         TreeView_Expand(sceneTree_, rootItem, TVE_EXPAND);
-        TreeView_Expand(sceneTree_, assetsGroupItem, TVE_EXPAND);
-        TreeView_Expand(sceneTree_, entitiesGroupItem, TVE_EXPAND);
+        TreeView_Expand(sceneTree_, assetsItem, TVE_EXPAND);
     }
 
     uint32_t GetViewportHeight() const
@@ -674,12 +807,6 @@ private:
     HWND catalogTree_ = nullptr;
     HWND sceneTree_ = nullptr;
     HWND btnDelete_ = nullptr;
-    HWND btnXp_ = nullptr;
-    HWND btnXm_ = nullptr;
-    HWND btnYp_ = nullptr;
-    HWND btnYm_ = nullptr;
-    HWND btnZp_ = nullptr;
-    HWND btnZm_ = nullptr;
     core::Window window_{};
     renderer::Dx11Context dxContext_{};
     renderer::Dx11Renderer renderer_{};
@@ -689,6 +816,10 @@ private:
     float mouseNdcX_ = 0.0f;
     float mouseNdcY_ = 0.0f;
     bool cursorInsideViewport_ = false;
+    bool isDraggingEntity_ = false;
+    float dragStartMouseNdcX_ = 0.0f;
+    float dragStartMouseNdcY_ = 0.0f;
+    math::Vec3 dragStartPosition_{};
     uint64_t lastTickMs_ = 0;
 };
 

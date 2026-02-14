@@ -11,6 +11,12 @@ D:\estudo directx\src\editor\SceneHubWindow.cpp;D:\estudo directx\build_repair_v
 D:\estudo directx\src\editor\AssetPickerWindow.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\AssetPickerWindow.obj
 D:\estudo directx\src\editor\MaterialEditorWindow.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\MaterialEditorWindow.obj
 D:\estudo directx\src\editor\ModelImport.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\ModelImport.obj
+D:\estudo directx\src\editor\EditorUI.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\EditorUI.obj
+D:\estudo directx\src\editor\SceneView.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\SceneView.obj
+D:\estudo directx\src\editor\SceneCamera.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\SceneCamera.obj
+D:\estudo directx\src\editor\HierarchyPanel.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\HierarchyPanel.obj
+D:\estudo directx\src\editor\InspectorPanel.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\InspectorPanel.obj
+D:\estudo directx\src\editor\GizmoSystem.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\GizmoSystem.obj
 D:\estudo directx\src\core\InputController.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\InputController.obj
 D:\estudo directx\src\core\CameraController.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\CameraController.obj
 D:\estudo directx\src\core\Logger.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\Logger.obj

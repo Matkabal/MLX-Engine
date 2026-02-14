@@ -405,6 +405,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="D:\estudo directx\src\editor\AssetPickerWindow.cpp" />
     <ClCompile Include="D:\estudo directx\src\editor\MaterialEditorWindow.cpp" />
     <ClCompile Include="D:\estudo directx\src\editor\ModelImport.cpp" />
+    <ClCompile Include="D:\estudo directx\src\editor\EditorUI.cpp" />
+    <ClCompile Include="D:\estudo directx\src\editor\SceneView.cpp" />
+    <ClCompile Include="D:\estudo directx\src\editor\SceneCamera.cpp" />
+    <ClCompile Include="D:\estudo directx\src\editor\HierarchyPanel.cpp" />
+    <ClCompile Include="D:\estudo directx\src\editor\InspectorPanel.cpp" />
+    <ClCompile Include="D:\estudo directx\src\editor\GizmoSystem.cpp" />
     <ClCompile Include="D:\estudo directx\src\core\InputController.cpp" />
     <ClCompile Include="D:\estudo directx\src\core\CameraController.cpp" />
     <ClCompile Include="D:\estudo directx\src\core\Logger.cpp" />

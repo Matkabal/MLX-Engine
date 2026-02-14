@@ -98,9 +98,17 @@ namespace editor
             }
         }
 
-        for (const ecs::Entity root : roots)
+        if (ImGui::TreeNodeEx("SceneRoot", ImGuiTreeNodeFlags_DefaultOpen, "Scene"))
         {
-            DrawNodeRecursive(root, scene, childrenByParent, selectedEntity);
+            if (ImGui::TreeNodeEx("AssetsRoot", ImGuiTreeNodeFlags_DefaultOpen, "Assets"))
+            {
+                for (const ecs::Entity root : roots)
+                {
+                    DrawNodeRecursive(root, scene, childrenByParent, selectedEntity);
+                }
+                ImGui::TreePop();
+            }
+            ImGui::TreePop();
         }
         ImGui::End();
 #else
