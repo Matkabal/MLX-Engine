@@ -1,0 +1,108 @@
+{
+    "asset":  {
+                  "version":  "2.0",
+                  "generator":  "DX11Study-TowelGenerator"
+              },
+    "buffers":  [
+                    {
+                        "uri":  "towel.bin",
+                        "byteLength":  46968
+                    }
+                ],
+    "bufferViews":  [
+                        {
+                            "byteLength":  10368,
+                            "byteOffset":  0,
+                            "target":  34962,
+                            "buffer":  0
+                        },
+                        {
+                            "byteLength":  10368,
+                            "byteOffset":  10368,
+                            "target":  34962,
+                            "buffer":  0
+                        },
+                        {
+                            "byteLength":  6912,
+                            "byteOffset":  20736,
+                            "target":  34962,
+                            "buffer":  0
+                        },
+                        {
+                            "byteLength":  19320,
+                            "byteOffset":  27648,
+                            "target":  34963,
+                            "buffer":  0
+                        }
+                    ],
+    "accessors":  [
+                      {
+                          "byteOffset":  0,
+                          "min":  [
+                                      -0.9,
+                                      -0.0683455244,
+                                      -0.55
+                                  ],
+                          "type":  "VEC3",
+                          "max":  [
+                                      0.9,
+                                      0.05954684,
+                                      0.55
+                                  ],
+                          "count":  864,
+                          "bufferView":  0,
+                          "componentType":  5126
+                      },
+                      {
+                          "type":  "VEC3",
+                          "byteOffset":  0,
+                          "bufferView":  1,
+                          "count":  864,
+                          "componentType":  5126
+                      },
+                      {
+                          "type":  "VEC2",
+                          "byteOffset":  0,
+                          "bufferView":  2,
+                          "count":  864,
+                          "componentType":  5126
+                      },
+                      {
+                          "type":  "SCALAR",
+                          "byteOffset":  0,
+                          "bufferView":  3,
+                          "count":  4830,
+                          "componentType":  5125
+                      }
+                  ],
+    "meshes":  [
+                   {
+                       "name":  "TowelMesh",
+                       "primitives":  [
+                                          {
+                                              "attributes":  {
+                                                                 "POSITION":  0,
+                                                                 "TEXCOORD_0":  2,
+                                                                 "NORMAL":  1
+                                                             },
+                                              "indices":  3,
+                                              "mode":  4
+                                          }
+                                      ]
+                   }
+               ],
+    "nodes":  [
+                  {
+                      "name":  "TowelNode",
+                      "mesh":  0
+                  }
+              ],
+    "scenes":  [
+                   {
+                       "nodes":  [
+                                     0
+                                 ]
+                   }
+               ],
+    "scene":  0
+}

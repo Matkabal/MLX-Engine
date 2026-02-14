@@ -1,0 +1,10 @@
+^D:\ESTUDO DIRECTX\BUILD_REPAIR_VS\CMAKEFILES\804ABD43197DDA8D5CCF52807BA7D6F2\GENERATE.STAMP.RULE
+setlocal
+"D:\Program Files\CMake\bin\cmake.exe" "-SD:/estudo directx" "-BD:/estudo directx/build_repair_vs" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "D:/estudo directx/build_repair_vs/DX11Study.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
