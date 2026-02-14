@@ -1,3 +1,38 @@
+# Agent files
 AGENTS.md
 agents.md
 [Aa]GENTS.md
+
+# Build outputs
+build/
+build*/
+out/
+Debug/
+Release/
+x64/
+Win32/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Visual Studio
+.vs/
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+*.vcxproj.user
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.ipch
+*.tlog
+*.lastbuildstate
+
+# Logs
+log/
+logs/
+*.log
