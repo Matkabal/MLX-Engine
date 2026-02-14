@@ -11,8 +11,7 @@
 
 #include "assets/AssetManager.h"
 #include "assets/MaterialLibrary.h"
-#include "core/CameraController.h"
-#include "math/camera.h"
+#include "math/mat4.h"
 #include "renderer/Dx11Context.h"
 #include "renderer/Mesh.h"
 #include "renderer/Dx11ShaderProgram.h"
@@ -35,8 +34,7 @@ namespace renderer
             assets::AssetManager& assetManager,
             const assets::MaterialLibrary& materials);
         void OnResize(uint32_t width, uint32_t height);
-        void OnMouseMoveNdc(float ndcX, float ndcY);
-        void OnMouseButton(bool leftDown);
+        void SetCameraMatrices(const math::Mat4& view, const math::Mat4& projection);
         void RenderFrame(Dx11Context& context, const std::vector<scene::RenderEntity>& renderList);
 
     private:
@@ -97,16 +95,13 @@ namespace renderer
         Microsoft::WRL::ComPtr<ID3D11Buffer> axisIndexBuffer_;
         uint32_t axisIndexCount_ = 0;
         std::shared_ptr<Dx11ShaderProgram> axisShader_;
-        math::Camera camera_{};
-        core::CameraController cameraController_{};
+        math::Mat4 viewMatrix_ = math::Identity();
+        math::Mat4 projectionMatrix_ = math::Identity();
         Dx11Context* context_ = nullptr;
         assets::AssetManager* assetManager_ = nullptr;
         const assets::MaterialLibrary* materials_ = nullptr;
         std::unordered_map<std::string, RenderObject> renderObjectCache_{};
         std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textureSrvCache_{};
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> whiteTextureSrv_;
-        float mouseNdcX_ = 0.0f;
-        float mouseNdcY_ = 0.0f;
-        float lastFrameTimeSec_ = 0.0f;
     };
 }

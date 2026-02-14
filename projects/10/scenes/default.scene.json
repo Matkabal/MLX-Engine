@@ -1,0 +1,64 @@
+{
+  "objects": [
+    {
+      "asset": "adamHead.gltf",
+      "meshIndex": -1,
+      "position": [
+        -1.5499999523162842,
+        -2.69346022605896,
+        0.0
+      ],
+      "primitiveIndex": -1,
+      "rotation": [
+        0.0,
+        3.1415927410125732,
+        0.0
+      ],
+      "scale": [
+        16.0,
+        16.0,
+        16.0
+      ]
+    },
+    {
+      "asset": "adamHead.gltf",
+      "meshIndex": -1,
+      "position": [
+        -0.2421875,
+        -0.23529410362243652,
+        0.0
+      ],
+      "primitiveIndex": -1,
+      "rotation": [
+        0.0,
+        3.1415927410125732,
+        0.0
+      ],
+      "scale": [
+        16.0,
+        16.0,
+        16.0
+      ]
+    },
+    {
+      "asset": "adamHead.gltf",
+      "meshIndex": -1,
+      "position": [
+        -0.390625,
+        -0.10084033012390137,
+        0.0
+      ],
+      "primitiveIndex": -1,
+      "rotation": [
+        0.0,
+        3.1415927410125732,
+        0.0
+      ],
+      "scale": [
+        16.0,
+        16.0,
+        16.0
+      ]
+    }
+  ]
+}

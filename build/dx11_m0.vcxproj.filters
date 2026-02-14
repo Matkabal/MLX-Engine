@@ -58,6 +58,15 @@
     <ClCompile Include="D:\estudo directx\src\editor\GizmoSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\editor\CameraGizmo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\camera\CameraSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\estudo directx\src\input\InputSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="D:\estudo directx\src\core\InputController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -5,6 +5,11 @@
       "id": "default_color",
       "vs": "shaders/triangle_vs.hlsl",
       "ps": "shaders/triangle_ps.hlsl"
+    },
+    {
+      "id": "complex_lit",
+      "vs": "shaders/model_complex_vs.hlsl",
+      "ps": "shaders/model_complex_ps.hlsl"
     }
   ],
   "assetBindings": [
@@ -64,12 +69,12 @@
     },
     {
       "asset": "adamHead.gltf",
-      "shaderId": "default_color",
+      "shaderId": "complex_lit",
       "objects": [
         {
           "position": [0.0, -0.1, 0.0],
           "rotationDeg": [0.0, 180.0, 0.0],
-          "scale": [1.0, 1.0, 1.0],
+          "scale": [16.0, 16.0, 16.0],
           "motion": { "enabled": false, "amplitude": 0.0, "speed": 1.0 },
           "physics": { "enabled": false, "stiffness": 10.0, "damping": 4.0 }
         }

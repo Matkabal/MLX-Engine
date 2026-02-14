@@ -16,9 +16,13 @@
 #include "assets/AssetRegistry.h"
 #include "assets/MaterialLibrary.h"
 #include "assets/SceneRepository.h"
+#include "camera/CameraComponent.h"
+#include "camera/CameraSystem.h"
 #include "core/Window.h"
 #include "editor/ProjectBrowserWindow.h"
 #include "editor/EditorUI.h"
+#include "editor/CameraGizmo.h"
+#include "input/InputSystem.h"
 #include "renderer/Dx11Context.h"
 #include "renderer/Dx11Renderer.h"
 #include "scene/Scene.h"
@@ -112,6 +116,8 @@ public:
         {
             return false;
         }
+        cameraSystem_.Update(cameraComponent_, camera::CameraInputState{}, 16.0f / 9.0f, 1.0f / 60.0f);
+        renderer_.SetCameraMatrices(cameraComponent_.viewMatrix, cameraComponent_.projectionMatrix);
         editorUi_.Initialize(window_, dxContext_);
 
         LoadCatalogTree();
@@ -154,24 +160,37 @@ public:
 
         mouseNdcX_ = (static_cast<float>(x) / static_cast<float>(width_)) * 2.0f - 1.0f;
         mouseNdcY_ = 1.0f - (static_cast<float>(y) / static_cast<float>(viewportHeight)) * 2.0f;
-        renderer_.OnMouseMoveNdc(mouseNdcX_, mouseNdcY_);
+        inputSystem_.SetMouseNdc(mouseNdcX_, mouseNdcY_);
 
         if (isDraggingEntity_ && selectedEntity_ != ecs::kInvalidEntity)
         {
             auto* t = scene_.Components().Get<scene::TransformComponent>(selectedEntity_);
             if (t)
             {
-                t->local.position.x = dragStartPosition_.x + (mouseNdcX_ - dragStartMouseNdcX_);
-                t->local.position.y = dragStartPosition_.y + (mouseNdcY_ - dragStartMouseNdcY_);
+                const float dx = (mouseNdcX_ - dragStartMouseNdcX_);
+                const float dy = (mouseNdcY_ - dragStartMouseNdcY_);
+
+                // Mouse drag modes (without keyboard modifiers):
+                // - LMB drag: X/Y plane
+                // - Hold RMB while dragging: depth on Z axis
+                if ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0)
+                {
+                    t->local.position.z = dragStartPosition_.z + dy;
+                }
+                else
+                {
+                    t->local.position.x = dragStartPosition_.x + dx;
+                    t->local.position.y = dragStartPosition_.y + dy;
+                }
             }
         }
     }
 
     void OnMouseButton(bool leftDown) override
     {
+        inputSystem_.SetLeftMouse(leftDown);
         if (!cursorInsideViewport_)
         {
-            renderer_.OnMouseButton(leftDown);
             return;
         }
 
@@ -203,7 +222,11 @@ public:
             SaveSceneFromEcs();
             RefreshSceneTree();
         }
-        renderer_.OnMouseButton(leftDown);
+    }
+
+    void OnMouseWheel(float delta) override
+    {
+        inputSystem_.AddWheelDelta(delta);
     }
 
     void OnBackToStartRequested() override
@@ -384,9 +407,19 @@ private:
     {
         // One asset import => one entity in scene.
         // Renderer uses meshIndex=-1 to draw all meshes from the glTF.
+        const assets::AssetRenderConfig cfg = materialLibrary_.ResolveRenderConfigForAsset(assetFileName);
+        math::Transform finalTransform = rootTransform;
+        if (!cfg.objects.empty())
+        {
+            // Keep clicked placement for X/Y, but inherit authored Z/rotation/scale from material config.
+            finalTransform.position.z = cfg.objects[0].transform.position.z;
+            finalTransform.rotationRadians = cfg.objects[0].transform.rotationRadians;
+            finalTransform.scale = cfg.objects[0].transform.scale;
+        }
+
         const ecs::Entity rootEntity = scene_.CreateEntity();
         scene::TransformComponent rootTc{};
-        rootTc.local = rootTransform;
+        rootTc.local = finalTransform;
         scene_.Components().Add<scene::TransformComponent>(rootEntity, rootTc);
         scene_.Components().Add<scene::NameComponent>(
             rootEntity,
@@ -766,6 +799,24 @@ private:
         renderer_.OnResize(width_, viewportHeight);
     }
 
+    editor::CameraGizmoDelta DrawCameraGizmo()
+    {
+        return cameraGizmo_.DrawCameraGizmo(cameraComponent_);
+    }
+
+    void UpdateCameraInput(float dtSeconds, const editor::CameraGizmoDelta& gizmoDelta)
+    {
+        const input::InputFrame frame = inputSystem_.BuildFrameInput();
+        camera::CameraInputState inputState{};
+        camera::UpdateCameraInput(frame, gizmoDelta, inputState);
+
+        const float aspect = (GetViewportHeight() > 0)
+            ? (static_cast<float>(width_) / static_cast<float>(GetViewportHeight()))
+            : (16.0f / 9.0f);
+        cameraSystem_.Update(cameraComponent_, inputState, aspect, dtSeconds);
+        renderer_.SetCameraMatrices(cameraComponent_.viewMatrix, cameraComponent_.projectionMatrix);
+    }
+
     void Render()
     {
         const uint64_t nowMs = GetTickCount64();
@@ -782,6 +833,8 @@ private:
             return;
         }
         editorUi_.BeginFrame();
+        const editor::CameraGizmoDelta gizmoDelta = DrawCameraGizmo();
+        UpdateCameraInput(dtSeconds, gizmoDelta);
         editorUi_.Update(scene_, assetManager_, dtSeconds);
         sceneRenderer_.Render(scene_, dxContext_, renderer_);
         editorUi_.EndFrame();
@@ -811,6 +864,10 @@ private:
     renderer::Dx11Context dxContext_{};
     renderer::Dx11Renderer renderer_{};
     editor::EditorUI editorUi_{};
+    input::InputSystem inputSystem_{};
+    camera::CameraComponent cameraComponent_{};
+    camera::CameraSystem cameraSystem_{};
+    editor::CameraGizmo cameraGizmo_{};
     uint32_t width_ = 1280;
     uint32_t height_ = 720;
     float mouseNdcX_ = 0.0f;

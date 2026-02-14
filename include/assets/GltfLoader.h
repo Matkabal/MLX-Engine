@@ -35,6 +35,7 @@ namespace assets
     {
         math::Vec4 baseColorFactor{1.0f, 1.0f, 1.0f, 1.0f};
         std::string baseColorTexturePath;
+        std::string normalTexturePath;
     };
 
     struct GltfNodeData

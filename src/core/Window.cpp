@@ -146,6 +146,14 @@ namespace core
             }
             return 0;
 
+        case WM_MOUSEWHEEL:
+            if (events_)
+            {
+                const short wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+                events_->OnMouseWheel(static_cast<float>(wheelDelta) / static_cast<float>(WHEEL_DELTA));
+            }
+            return 0;
+
         case WM_COMMAND:
             if (events_)
             {

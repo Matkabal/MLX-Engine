@@ -17,6 +17,9 @@ D:\estudo directx\src\editor\SceneCamera.cpp;D:\estudo directx\build_repair_vs\d
 D:\estudo directx\src\editor\HierarchyPanel.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\HierarchyPanel.obj
 D:\estudo directx\src\editor\InspectorPanel.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\InspectorPanel.obj
 D:\estudo directx\src\editor\GizmoSystem.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\GizmoSystem.obj
+D:\estudo directx\src\editor\CameraGizmo.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\CameraGizmo.obj
+D:\estudo directx\src\camera\CameraSystem.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\CameraSystem.obj
+D:\estudo directx\src\input\InputSystem.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\InputSystem.obj
 D:\estudo directx\src\core\InputController.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\InputController.obj
 D:\estudo directx\src\core\CameraController.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\CameraController.obj
 D:\estudo directx\src\core\Logger.cpp;D:\estudo directx\build_repair_vs\dx11_m0.dir\Debug\Logger.obj

@@ -2,10 +2,8 @@
 
 #include <cstring>
 #include <filesystem>
-#include <limits>
 #include <string>
 #include <vector>
-#include <windows.h>
 
 #include "core/Logger.h"
 #include "stb_image.h"
@@ -58,11 +56,8 @@ namespace renderer
             return false;
         }
 
-        camera_.SetHandedness(math::Handedness::LeftHanded);
-        camera_.SetPosition(math::Vec3{0.0f, 0.0f, -3.0f});
-        camera_.SetTarget(math::Vec3{0.0f, 0.0f, 0.0f});
-        camera_.SetNearFar(0.1f, 100.0f);
-        cameraController_.ResetFromCamera(camera_);
+        viewMatrix_ = math::LookAtLH(math::Vec3{0.0f, 0.0f, -3.0f}, math::Vec3{0.0f, 0.0f, 0.0f}, math::Vec3{0.0f, 1.0f, 0.0f});
+        projectionMatrix_ = math::PerspectiveLH(1.04719755f, 16.0f / 9.0f, 0.1f, 100.0f);
         return true;
     }
 
@@ -72,19 +67,13 @@ namespace renderer
         {
             return;
         }
-        camera_.SetAspect(static_cast<float>(width) / static_cast<float>(height));
+        projectionMatrix_ = math::PerspectiveLH(1.04719755f, static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
     }
 
-    void Dx11Renderer::OnMouseMoveNdc(float ndcX, float ndcY)
+    void Dx11Renderer::SetCameraMatrices(const math::Mat4& view, const math::Mat4& projection)
     {
-        mouseNdcX_ = ndcX;
-        mouseNdcY_ = ndcY;
-        cameraController_.OnMouseMoveNdc(ndcX, ndcY);
-    }
-
-    void Dx11Renderer::OnMouseButton(bool leftDown)
-    {
-        (void)leftDown;
+        viewMatrix_ = view;
+        projectionMatrix_ = projection;
     }
 
     void Dx11Renderer::RenderFrame(Dx11Context& context, const std::vector<scene::RenderEntity>& renderList)
@@ -100,21 +89,8 @@ namespace renderer
             deviceContext->RSSetState(rasterizerState_.Get());
         }
 
-        const float timeSec = static_cast<float>(GetTickCount64()) * 0.001f;
-        float dtSec = (lastFrameTimeSec_ > 0.0f) ? (timeSec - lastFrameTimeSec_) : (1.0f / 60.0f);
-        if (dtSec < 0.0f)
-        {
-            dtSec = 0.0f;
-        }
-        if (dtSec > 0.1f)
-        {
-            dtSec = 0.1f;
-        }
-        lastFrameTimeSec_ = timeSec;
-        cameraController_.Update(dtSec, camera_);
-
-        const math::Mat4 view = camera_.GetView();
-        const math::Mat4 projection = camera_.GetProjection();
+        const math::Mat4 view = viewMatrix_;
+        const math::Mat4 projection = projectionMatrix_;
 
         if (axisShader_ && axisVertexBuffer_ && axisIndexBuffer_ && axisIndexCount_ > 0)
         {

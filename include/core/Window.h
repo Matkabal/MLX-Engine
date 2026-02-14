@@ -22,6 +22,7 @@ namespace core
         virtual void OnCloseRequested() = 0;
         virtual void OnMouseMove(int32_t x, int32_t y) = 0;
         virtual void OnMouseButton(bool leftDown) = 0;
+        virtual void OnMouseWheel(float delta) { (void)delta; }
         virtual void OnBackToStartRequested() = 0;
         virtual void OnCommand(int id, int code) { (void)id; (void)code; }
         virtual void OnNotify(const NMHDR* hdr) { (void)hdr; }

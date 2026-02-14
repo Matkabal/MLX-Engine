@@ -25,6 +25,9 @@ add_executable(dx11_m0 WIN32
     src/editor/HierarchyPanel.cpp
     src/editor/InspectorPanel.cpp
     src/editor/GizmoSystem.cpp
+    src/editor/CameraGizmo.cpp
+    src/camera/CameraSystem.cpp
+    src/input/InputSystem.cpp
     src/core/InputController.cpp
     src/core/CameraController.cpp
     src/core/Logger.cpp

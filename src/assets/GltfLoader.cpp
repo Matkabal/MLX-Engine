@@ -16,6 +16,55 @@ namespace assets
 {
     namespace
     {
+        std::string ResolveImagePath(const std::filesystem::path& baseDir, const std::string& uri)
+        {
+            if (uri.empty())
+            {
+                return {};
+            }
+
+            const std::filesystem::path u(uri);
+            if (u.is_absolute())
+            {
+                return u.string();
+            }
+
+            // Some exporters write project-relative paths like "assets/models/...".
+            // Prefer them as-is if present, otherwise resolve relative to the glTF folder.
+            if (std::filesystem::exists(u))
+            {
+                return u.string();
+            }
+
+            return (baseDir / u).string();
+        }
+
+        void FillTexturePathFromTextureIndex(
+            const tinygltf::Model& model,
+            const std::filesystem::path& baseDir,
+            int textureIndex,
+            std::string& outPath)
+        {
+            if (textureIndex < 0 || textureIndex >= static_cast<int>(model.textures.size()))
+            {
+                return;
+            }
+
+            const tinygltf::Texture& tex = model.textures[textureIndex];
+            if (tex.source < 0 || tex.source >= static_cast<int>(model.images.size()))
+            {
+                return;
+            }
+
+            const tinygltf::Image& image = model.images[tex.source];
+            if (image.uri.empty())
+            {
+                return;
+            }
+
+            outPath = ResolveImagePath(baseDir, image.uri);
+        }
+
         bool GetAccessorView(
             const tinygltf::Model& model,
             const tinygltf::Accessor& accessor,
@@ -225,13 +274,41 @@ namespace assets
             }
             if (pbr.baseColorTexture.index >= 0 && pbr.baseColorTexture.index < static_cast<int>(model.textures.size()))
             {
-                const tinygltf::Texture& tex = model.textures[pbr.baseColorTexture.index];
-                if (tex.source >= 0 && tex.source < static_cast<int>(model.images.size()))
+                FillTexturePathFromTextureIndex(model, baseDir, pbr.baseColorTexture.index, m.baseColorTexturePath);
+            }
+
+            if (mat.normalTexture.index >= 0 && mat.normalTexture.index < static_cast<int>(model.textures.size()))
+            {
+                FillTexturePathFromTextureIndex(model, baseDir, mat.normalTexture.index, m.normalTexturePath);
+            }
+
+            // Support glTF extension used by Adam asset:
+            // KHR_materials_pbrSpecularGlossiness.diffuseTexture / diffuseFactor
+            const auto extIt = mat.extensions.find("KHR_materials_pbrSpecularGlossiness");
+            if (extIt != mat.extensions.end() && extIt->second.IsObject())
+            {
+                const tinygltf::Value& ext = extIt->second;
+                if (ext.Has("diffuseFactor"))
                 {
-                    const tinygltf::Image& image = model.images[tex.source];
-                    if (!image.uri.empty())
+                    const tinygltf::Value& factor = ext.Get("diffuseFactor");
+                    if (factor.IsArray() && factor.ArrayLen() >= 4)
                     {
-                        m.baseColorTexturePath = (baseDir / image.uri).string();
+                        m.baseColorFactor = math::Vec4{
+                            static_cast<float>(factor.Get(0).GetNumberAsDouble()),
+                            static_cast<float>(factor.Get(1).GetNumberAsDouble()),
+                            static_cast<float>(factor.Get(2).GetNumberAsDouble()),
+                            static_cast<float>(factor.Get(3).GetNumberAsDouble()),
+                        };
+                    }
+                }
+
+                if (ext.Has("diffuseTexture"))
+                {
+                    const tinygltf::Value& diffTex = ext.Get("diffuseTexture");
+                    if (diffTex.IsObject() && diffTex.Has("index"))
+                    {
+                        const int texIndex = diffTex.Get("index").GetNumberAsInt();
+                        FillTexturePathFromTextureIndex(model, baseDir, texIndex, m.baseColorTexturePath);
                     }
                 }
             }
